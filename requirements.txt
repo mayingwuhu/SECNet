@@ -18,3 +18,4 @@ ujson
 einops
 decord
 timm
+spacy
