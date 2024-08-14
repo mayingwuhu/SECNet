@@ -5,7 +5,11 @@ PyTorch evaluate code for SECNet. 我们的模型和ALPRO进行对比.
 
 ## Installation 
 ### Dependencies
-我们的代码在Ubuntu上运行，您需要准备一些数据
+我们的代码在Ubuntu上运行，您需要准备一些材料
+1.打开(lianjie)()将xxx下载到根目录下
+2.将xxx下载放置到xxx目录下
+最后的目录树为：
+
 
 ### Installation Steps
 1. horovod库 
