@@ -4,18 +4,19 @@ Semantic Element Consistency Learning. PyTorch evaluate code for SECNet.
 ## Installation 
 ### Dependencies
 我们的代码在Ubuntu上运行，您需要准备一些材料
-1. 打开(Link)(这部分内容过大放在Goodle中，由于匿名提交，Coming Soon)将ALPRO_model.pt、SECNet_model.pt、bert-base-uncased.zip、vit_base_patch16_224.zip下载到根目录下，并解压相应zip文件
+1. 打开(Link)(这部分内容过大放在Goodle中，由于匿名提交，Coming Soon)将ALPRO_model.pt、SECNet_model.pt、bert-base-uncased.zip、vit_base_patch16_224.zip、ext.zip下载到根目录下，并解压相应zip文件
 2. 将videos.pt下载放置到data/msrvtt_ret目录下
 
-### 最后的目录树为：
+最后的目录树为：
 ```
 - SECNet 
   - bert-base-uncased 
-  - config_release 
+  - config_release  
   - data 
-    - msrvtt
+    - msrvtt 
       - txt
       - videos
+  - ext
   - output
   - run_scripts
   - src
@@ -25,25 +26,27 @@ Semantic Element Consistency Learning. PyTorch evaluate code for SECNet.
 ```
 
 ### Installation Steps
-1. horovod库 
-2. 其他
-
-## Usage Example
-```python
-# You can showcase some code examples here
+```
+conda create -n SECNet python=3.7
+pip install cmake==3.13.0 
+conda install pytorch torchvision torchaudio pytorch-cuda=11.7 -c pytorch -c nvidia
+pip install horovod
+pip install -r requirements.txt
 ```
 
-## Contributing
-We welcome and encourage contributions to the project. If you have any suggestions or ideas, please submit an issue or PR.
 
-## License
-This project is licensed under the XXX License. For more details, please see the [LICENSE](LICENSE) file.
+## Training SECNet
+```
+conda activate SECNet 
+cd run_scripts 
+bash pt_SECNet.sh 
+```
 
-## Contact Us
-If you have any questions or suggestions, you can reach us via:
-- Email: xxx@example.com
-- WeChat: xxx_xxx
+## Test on MSRVTT 
+```
+conda activate SECNet  
+cd run_scripts 
+bash inf_msrvtt_ret.sh     
+```
+你可以将`config_release/msrvtt_ret.json`中的`e2e_weights_path`改为`SECNet_model`以获得SECNet的测试结果               
 
----
-
-I hope this template helps you get started. Remember to customize the README file according to the specific needs of your project. Good luck with your project!
