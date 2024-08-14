@@ -58,6 +58,4 @@ You can modify `e2e_weights_path` in `config_release/msrvtt_ret.json` to `SECNet
 | MSRVTT  | ALPRO   | 24.7     | 44.6 | 55.5 | 7.0   | 22.4     | 40.8 | 50.4 | 10.0  |
 |         | Ours    | **27.6** | **49.4** | **59.1** | **6.0** | **24.0** | **44.5** | **53.8** | **8.0**  |
 
----
 
-This README file is now fully in English, maintaining a professional and objective tone. It includes all necessary instructions for setting up, training, and testing the SECNet model.
