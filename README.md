@@ -1,15 +1,30 @@
 # SECNet 
-
+Semantic Element Consistency Learning
 ## Introduction
-PyTorch evaluate code for SECNet. 我们的模型和ALPRO进行对比. 
+PyTorch evaluate code for SECNet. 
 
 ## Installation 
 ### Dependencies
 我们的代码在Ubuntu上运行，您需要准备一些材料
-1. 打开(lianjie)()将xxx下载到根目录下
-2. 将xxx下载放置到xxx目录下
-最后的目录树为：
+1. 打开(Link)(由于保密提交，这部分内容过大放在Goodle中，Coming Soon)将ALPRO_model.pt、SECNet_model.pt、bert-base-uncased.zip、vit_base_patch16_224.zip下载到根目录下，并解压相应zip文件
+2. 将videos.pt下载放置到data/msrvtt_ret目录下
 
+### 最后的目录树为：
+```
+- SECNet 
+  - bert-base-uncased 
+  - config_release 
+  - data 
+    - msrvtt
+      - txt
+      - videos
+  - output
+  - run_scripts
+  - src
+  - vit_base_patch16_224
+  - ALPRO_model.pt
+  - SECNet_model.pt
+```
 
 ### Installation Steps
 1. horovod库 
