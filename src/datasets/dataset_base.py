@@ -9,7 +9,6 @@ import torch
 from decord import VideoReader
 from torch.utils.data import Dataset
 
-sys.path.append("/home/mayu/pythonProject/ALPRO/ALPRO-main/src")
 from src.datasets.data_utils import (
     ImageResize, ImagePad, image_to_tensor)
 
@@ -142,7 +141,7 @@ class AlproBaseDataset(Dataset):
             else:
                 vr = VideoReader(video_path, width=width, height=height)
 
-            vlen = len(vr)#总帧数
+            vlen = len(vr)
 
             if start_time or end_time:
                 assert fps > 0, 'must provide video fps if specifying start and end time.'
@@ -152,7 +151,7 @@ class AlproBaseDataset(Dataset):
             else:
                 start_idx, end_idx = 0, vlen
 
-            #取num_frm张样本，返回ndarry数据类型
+            
             if self.frm_sampling_strategy == 'uniform':
                 frame_indices = np.arange(start_idx, end_idx, vlen / self.num_frm, dtype=int)
             elif self.frm_sampling_strategy == 'nlvl_uniform':
