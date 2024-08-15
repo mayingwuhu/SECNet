@@ -1,5 +1,4 @@
 import os
-os.environ['CURL_CA_BUNDLE'] = ''
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -16,12 +15,11 @@ from torch import nn
 from torch.nn import CrossEntropyLoss
 
 
-#被嵌套使用
+
 class AlproBaseModel(nn.Module):
     def __init__(self, config=None, input_format='RGB', video_enc_cfg=None, temp=0.07):
         super().__init__()
 
-        #定义/转化为可训练的参数
         self.temp = nn.Parameter(torch.ones([]) * temp)   
 
         self.bert_config = config
@@ -40,7 +38,6 @@ class AlproBaseModel(nn.Module):
 
         text_width = self.bert_config.hidden_size
 
-        #定义线性映射层
         self.vision_proj = nn.Linear(vision_width, embed_dim)
         self.text_proj = nn.Linear(text_width, embed_dim)         
 
@@ -72,7 +69,7 @@ class AlproForPretrain(AlproBaseModel):
         self.prompter = Prompter(config, video_enc_cfg)
 
         self.use_mask_prob = 0
-        #定义了一个多层感知机mpm_head来处理伪标签，线性层
+
         self.mpm_head = nn.Sequential(
             nn.Linear(config.hidden_size,
                     config.hidden_size * 2),
@@ -88,22 +85,22 @@ class AlproForPretrain(AlproBaseModel):
 
     def forward(self, batch):
         with torch.no_grad():
-            self.temp.clamp_(0.001,0.5)#将temp参数固定，不训练它并将它的参数限制在(0.001到0.5)之间
+            self.temp.clamp_(0.001,0.5)
 
         visual_inputs = batch['visual_inputs']
 
-        #根据batch中是否含有“mpm_mask键判断是否使用mpm”
+    
         use_mpm = 'mpm_mask' in batch
         if use_mpm:
             context_visual_inputs = batch['context_visual_inputs']
 
-        #获取设备信息和尺寸，b批次，t时间维度，c通道数，hw高宽
+
         device = visual_inputs.device
         b, t, c, h, w = visual_inputs.shape
 
         # forward image and text features
         # feats are normalized embeds
-        #获得视频的embed，决定是否使用掩码预测模型，如果use_mpm为True且随机概率小于0，同时处理原始视频和上下文视频输入，否则只处理原视频
+
         if use_mpm and np.random.uniform() < self.use_mask_prob:
             video_embeds_total = self._forward_visual_embeds(torch.cat([visual_inputs, context_visual_inputs], dim=0))
             # split for unmasked and masked
@@ -113,21 +110,21 @@ class AlproForPretrain(AlproBaseModel):
             context_video_embeds = video_embeds
 
         # we compute normalized feats for unmasked visual inputs only, used for ITC
-        #获得视频的特征和注意力表示（通过投影和标准化嵌入响亮的第一个时间步来获取视频特征）
+    
         video_feat = F.normalize(self.vision_proj(video_embeds[:,0,:]),dim=-1)  
         video_atts = torch.ones(video_embeds.size()[:-1],dtype=torch.long).to(device)
         
         # text embeddings and features
-        #获得文本的embed和特征表示
+
         text_embeds, text_feat = self._forward_text_feats(batch)
 
         # ========== (in-batch) ITC loss ==========
-        # ITC loss就是VTC loss（I-image 几个imgae就是一个Video）
+
         gathered_video_feats = hvd.allgather(video_feat)
         gathered_text_feats = hvd.allgather(text_feat)
 
         assert self.itc_token_type == 'cls', 'Support CLS tokens for ITC only, find {}.'.format(self.itc_token_type)
-        #计算视频特征和文本特征的点积，除以温度参数进行缩放
+  
         sim_v2t = video_feat @ gathered_text_feats.t() / self.temp 
         sim_t2v = text_feat @ gathered_video_feats.t() / self.temp 
                              
@@ -139,13 +136,13 @@ class AlproForPretrain(AlproBaseModel):
         b_start, b_end = b * local_rank, b * (local_rank + 1)
         sim_targets[:, b_start: b_end] = torch.eye(b)
 
-        #计算两个方向上的损失
+
         loss_v2t = -torch.sum(F.log_softmax(sim_v2t, dim=1)*sim_targets,dim=1).mean()
         loss_t2v = -torch.sum(F.log_softmax(sim_t2v, dim=1)*sim_targets,dim=1).mean() 
 
         vtc_loss = (loss_v2t+loss_t2v) / 2
 
-        # ========= VTM损失 ==========
+
         text_atts = batch['text_input_mask']
 
         # non-masked text and non-masked image 
@@ -158,7 +155,7 @@ class AlproForPretrain(AlproBaseModel):
                                                                                  return_encoder_out=True
                                                                                 )
 
-        # ========= MLM损失 ==========
+
         # masked text and non-masked image
         if 'mlm_labels' in batch: 
             mlm_labels = batch['mlm_labels']
@@ -173,7 +170,7 @@ class AlproForPretrain(AlproBaseModel):
         else:
             mlm_logits = mlm_loss = mlm_labels = None
 
-        # ========= MPM（掩码预测模型损失） ==========
+
         if use_mpm: 
             mpm_labels, ignore_masks = self.get_pseudo_labels(batch)
 
@@ -187,7 +184,7 @@ class AlproForPretrain(AlproBaseModel):
         else:
             mpm_loss = mpm_logits = mpm_labels =  None
 
-        #返回损失和得分，用于在训练中更新权重
+  
         return dict(
             itc_loss=vtc_loss,
             mlm_scores=mlm_logits,  # (B, Lt, vocab_size),  only text part
@@ -206,10 +203,10 @@ class AlproForPretrain(AlproBaseModel):
         b, t, c, h, w = visual_inputs.shape
         # timeSformer asks for (b, c, t, h, w) as input.
         # image features
-        #timeSformer要求(b, c, t, h, w) 的输入通道，需要交换维度位置
+
         visual_inputs = visual_inputs.transpose(1, 2)
 
-        #用timesformer里面的forward_features计算返回的视觉特征向量
+
         video_embeds = self.visual_encoder.forward_features(visual_inputs, return_all_tokens=True)
 
         return video_embeds
@@ -221,39 +218,39 @@ class AlproForPretrain(AlproBaseModel):
                                              return_dict = True, 
                                              mode = 'text'
                                             )
-        #最后一层的隐藏状态可被看做文本的深层表示，作为文本嵌入
+
         text_embeds = text_output.last_hidden_state # b, Lt, fsz=768
-        #通过线性层和归一化操作计算特征向量
+
         text_feat = F.normalize(self.text_proj(text_embeds[:,0,:]),dim=-1) #self.text_proj = nn.Linear(text_width, embed_dim)
 
         return text_embeds, text_feat
 
-    #与soft_label有关，但是只在最后计算交叉熵损失上
+
     def compute_mpm_with_encoder_out(self, encoder_outputs, text_atts, soft_labels, ignore_masks, patch_masks):
         txt_len = text_atts.shape[1]
         # adding one to ignore visual cls tokens
         visual_output = encoder_outputs.last_hidden_state[:, txt_len+1:]
 
-        #掩码区域展平并反转，非掩码为1，掩码为0
+
         bsz, h, w = patch_masks.shape
         patch_masks_flatten_inverted = (1 - patch_masks.view(bsz, -1)).unsqueeze(-1)
 
         # mean embeds of masked visual regions
-        #计算每个样本中的被掩码的补丁数量，翻转掩码对视觉输出加权，只保留被掩码的区域嵌入，求和得到总embed，后除以数量得到平均嵌入
+
         num_masked_patches = torch.sum(patch_masks_flatten_inverted.squeeze(-1), dim=-1, keepdim=True)
 
         masked_visual_embeds = patch_masks_flatten_inverted * visual_output
         masked_visual_embeds = torch.sum(masked_visual_embeds, dim=1)
         masked_visual_embeds /= num_masked_patches
 
-        # loss通过一个全连接层得到预测logits
+
         mpm_logits = self.mpm_head(masked_visual_embeds)
 
-        #计算预测与soft_labels之间的交叉熵损失，将ignore_masks的地方指定为0，这些为0的位置的损失不会被计算
+
         cross_entropy = -torch.sum(F.log_softmax(mpm_logits, dim=1) * soft_labels, dim=1)
         cross_entropy[ignore_masks] = 0.
 
-        #通过总损失除以非忽略样本的数量计算mpm_loss损失
+
         mpm_loss = torch.sum(cross_entropy) / (bsz - torch.sum(ignore_masks))
 
         return mpm_loss, mpm_logits 
@@ -297,7 +294,6 @@ class AlproForPretrain(AlproBaseModel):
         device = text_embeds.device
 
         # ====== positive pairs =======
-        #拼接文本embed和视觉embed，利用注意力判断有效输入，送入Bert获取正样本对
         attention_mask = torch.cat([text_atts, video_atts], dim=1)
         embedding_output_pos = torch.cat([text_embeds, video_embeds], dim=1)
 
@@ -325,7 +321,6 @@ class AlproForPretrain(AlproBaseModel):
             weights_t2i = F.softmax(weights_t2i, dim=1)
 
         # select a negative image for each text
-        #对相似矩阵进行计算，为每一个正样本找到一个负样本
         # FIXME to optimize using indexing operations
         video_embeds_neg = []
         for b in range(bs):
@@ -354,19 +349,18 @@ class AlproForPretrain(AlproBaseModel):
         embedding_output_all = torch.cat([text_embeds_all, video_embeds_all], dim=1)
 
         # forward negative pairs via cross encoder
-        #对负样本也进行Bert编码，以获得他们的表示
         encoder_outputs_neg = self.text_encoder.bert(encoder_embeds=embedding_output_all,
                                                      attention_mask=attention_mask_all,
                                                      return_dict=True,
                                                      mode='fusion'
                                                     )
 
-        #将正负样本对的编码器的输出拼接，通过线性层itm_head来产生每个样本对时正样本还是负样本的预测
+
         vl_embeddings = torch.cat([encoder_outputs_pos.last_hidden_state[:,0,:], 
                                    encoder_outputs_neg.last_hidden_state[:,0,:]],dim=0)
         vtm_logits = self.itm_head(vl_embeddings)         # self.itm_head = nn.Linear(text_width, 2)
 
-        #创建正样本为1，负样本为0的标签张量，与vtm_logits做交叉熵，得VTM损失
+
         vtm_labels = torch.cat([torch.ones(bs,dtype=torch.long),torch.zeros(2*bs,dtype=torch.long)], dim=0).to(device)
         vtm_loss = F.cross_entropy(vtm_logits, vtm_labels)     
 
@@ -375,10 +369,9 @@ class AlproForPretrain(AlproBaseModel):
         else:
             return vtm_loss, vtm_logits, vtm_labels, None
 
-    #计算Mask language Modeling损失的函数
+
     def compute_mlm(self, input_ids, text_input_mask, video_embeds, video_atts, mlm_labels):
         # forward text features with masked_input_ids
-        #用Bert处理得到文本编码，通过last_hidden_state得到最后一层输出
         text_output = self.text_encoder.bert(input_ids,
                                              attention_mask=text_input_mask,
                                              return_dict=True,
@@ -387,7 +380,6 @@ class AlproForPretrain(AlproBaseModel):
         text_embeds = text_output.last_hidden_state
 
         # forward cross-encoder
-        #交叉编码器前向传播，encoder_outputs融合了文本和视频信息的表示
         attention_mask = torch.cat([text_input_mask, video_atts], dim=1)
         embedding_output = torch.cat([text_embeds, video_embeds], dim=1)
 
@@ -397,14 +389,14 @@ class AlproForPretrain(AlproBaseModel):
                                                  mode='fusion'
                                                 )
 
-        #提取交叉编码器输出的文本部分
+
         txt_len = text_input_mask.shape[1]
         txt_output = encoder_outputs.last_hidden_state[:, :txt_len]
 
-        #对可能遮掩单词进行分类，输出的mlm_logits包含了每个单词的预测分数
+
         mlm_logits = self.text_encoder.cls(txt_output)
 
-        #计算损失，得到所有预测平均损失mlm_loss
+
         loss_fct = CrossEntropyLoss()
         mlm_loss = loss_fct(mlm_logits.view(-1, self.bert_config.vocab_size), mlm_labels.view(-1))
 
@@ -421,7 +413,7 @@ class AlproForPretrain(AlproBaseModel):
 
         # TODO make path configurable
         if prompter_weights_path is not None:
-            #加载预训练的权重但不包括与prompt相关的权重，把权重变为字典表示后，检查键当中的字符串是否包含“prompt_feat”，如果包含，就剔除，将新的权重加载进来
+
             self.prompter.load_pretrained_weights_without_prompts(prompter_weights_path)#cfg.teacher_weights_path
 
 
@@ -615,7 +607,7 @@ class Prompter(AlproBaseModel):
 
         local_rank = hvd.local_rank()
         b_start, b_end = b * local_rank, b * (local_rank + 1)
-        sim_targets[:, b_start: b_end] = torch.eye(b)#生成对角线全1，其余部分全0的二维数组
+        sim_targets[:, b_start: b_end] = torch.eye(b)
 
         sim_v2t_scores = F.log_softmax(sim_v2t, dim=1)
         sim_t2v_scores = F.log_softmax(sim_t2v, dim=1)
@@ -783,11 +775,11 @@ class AlproForVideoTextRetrieval(AlproBaseModel):
         # timeSformer asks for (b, c, t, h, w) as input.
         # visual embeddings
 
-        #交换矩阵维度
+
         visual_inputs = visual_inputs.transpose(1, 2)
         print("TEST1!!!")
 
-        #视频数据编码
+
         video_embeds = self.visual_encoder.forward_features(visual_inputs, return_all_tokens=True)
         # image_embeds = image_embeds.repeat(text_input_mask.shape[0], 1, 1)
         video_feat = F.normalize(self.vision_proj(video_embeds[:,0,:]),dim=-1)  
@@ -804,7 +796,6 @@ class AlproForVideoTextRetrieval(AlproBaseModel):
         text_feat = F.normalize(self.text_proj(text_embeds[:,0,:]),dim=-1)                 
 
         # ========== (in-batch) ITC loss ==========
-        #allgather聚合每个进程上的数据
         gathered_video_feats = hvd.allgather(video_feat)
         gathered_text_feats = hvd.allgather(text_feat)
 
@@ -929,7 +920,7 @@ class AlproForVideoTextRetrieval(AlproBaseModel):
         video_embeds = self.visual_encoder.forward_features(visual_inputs, return_all_tokens=True)#video embedding
         video_feat = F.normalize(self.vision_proj(video_embeds[:,0,:]),dim=-1)  #video feature
 
-        video_embeds = video_embeds.repeat(text_input_mask.shape[0], 1, 1)#重复64次  torch.Size([64, 197, 768])
+        video_embeds = video_embeds.repeat(text_input_mask.shape[0], 1, 1)#torch.Size([64, 197, 768])
         # image_feat = image_feat.repeat(text_input_mask.shape[0], 1)
 
         video_atts = torch.ones(video_embeds.size()[:-1],dtype=torch.long).to(device)
@@ -938,10 +929,10 @@ class AlproForVideoTextRetrieval(AlproBaseModel):
                                              return_dict=True,
                                              mode='text'
                                             )
-        text_embeds = text_output.last_hidden_state#shape是(batch_size, sequence_length, hidden_size)，hidden_size=768,它是模型最后一层输出的隐藏状态
+        text_embeds = text_output.last_hidden_state#(batch_size, sequence_length, hidden_size)，hidden_size=768
         text_feat = F.normalize(self.text_proj(text_embeds[:,0,:]),dim=-1)     #text feature
 
-        vtc_sim_scores = video_feat @ text_feat.t() / self.temp #@矩阵乘法
+        vtc_sim_scores = video_feat @ text_feat.t() / self.temp 
 
         attention_mask = torch.cat([text_input_mask, video_atts], dim=1)
         embedding_output = torch.cat([text_embeds, video_embeds], dim=1)
