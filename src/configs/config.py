@@ -1,6 +1,3 @@
-"""
-Modified from UNITER code
-"""
 import argparse
 import json
 import os
