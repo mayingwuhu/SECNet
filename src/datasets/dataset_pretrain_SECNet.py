@@ -69,7 +69,7 @@ class PretrainSparseDataset(AlproBaseDataset):
         num_retries = 10  # skip error videos
 
         for _ in range(num_retries):
-            data_sample = self.datalist.iloc[index]#按行加载数据
+            data_sample = self.datalist.iloc[index]
 
             video_id = str(data_sample.video_id)
             txt_len = int(data_sample.txt_len)
@@ -80,11 +80,11 @@ class PretrainSparseDataset(AlproBaseDataset):
                 raise NotImplementedError("Un-supported text annotation format.")
 
             # fetch video
-            video_path = os.path.join(self.img_db_dir, video_id + self.video_fmt) #定位视频位置
+            video_path = os.path.join(self.img_db_dir, video_id + self.video_fmt) 
 
             # read with retries
             for i in range(3):
-                img_array = self._load_video_from_path_decord(video_path, height=self.resize_size, width=self.resize_size)#返回N*3*H*W的视频数据
+                img_array = self._load_video_from_path_decord(video_path, height=self.resize_size, width=self.resize_size)
 
                 if img_array is not None:
                     break
@@ -121,7 +121,7 @@ class PretrainSparseDataset(AlproBaseDataset):
 
 class PretrainImageTextDataset(Dataset):
     def __init__(self, datalist, tokenizer, img_lmdb_dir, is_train=True, crop_size=256, resize_size=288,num_frm=4, wh1_num_frm=2, wh2_num_frm=2, where_num_frm=1, when_num_frm=1, max_txt_len=40):
-        self.datalist = datalist #json读出来的数据集合
+        self.datalist = datalist 
         self.max_txt_len = max_txt_len
 
         self.crop_size = crop_size
@@ -168,7 +168,6 @@ class PretrainImageTextDataset(Dataset):
         end_time = None
         img_dir = self.img_dir
 
-        #定义one_hot_where和one_hot_when
         one_hot_where = [0] * len(self.where_class)
         label_dict_where = {label: index for index, label in enumerate(self.where_class)}
         one_hot_when = [0] * len(self.when_class)
@@ -239,7 +238,7 @@ class PretrainImageTextDataset(Dataset):
 
                 img_arr_WH2 = torch.cat([img_arr_W2, img_arr_H2], dim=0)
 
-                # 两个的caption
+                
                 text_WH1 = img_WH[0]['WH_caption']
                 text_WH2 = img_WH[1]['WH_caption']
 
@@ -309,7 +308,6 @@ class PretrainCollator(object):
     """is_train is kept here if we want to remove
     the randomness during validation of MLM accuracy.
     In that case, instantiate two PretrainCollator
-    如果我们想在验证MLM准确性的过程中消除随机性，则此处保留is_train。在这种情况下，实例化两个PretrainCollator
     """
     def __init__(self, tokenizer, 
                  mlm=False, mlm_probability=0.15,
@@ -326,12 +324,11 @@ class PretrainCollator(object):
         self.patch_size = patch_size
 
     def collate_batch(self, batch):
-        #通过判断batch中的第一个元素的"img"键是否为torch.Tensor类型，来确定使用哪种方式进行数据的整理，整理后的结果存储在visual_inputs变量中
         if isinstance(batch[0]["img_WH1"], torch.Tensor):
             v_collate = default_collate
         else:
             v_collate = img_collate
-        #根据上面的得到关于WH1,WH2,When,Where的visual_input
+
         visual_inputs_WH1 = v_collate([d["img_WH1"] for d in batch])# (B, #frm=1 or T, 3, H, W)
         visual_inputs_WH2 = v_collate([d["img_WH2"] for d in batch])
         visual_inputs_When = v_collate([d["img_When"] for d in batch])
@@ -340,7 +337,7 @@ class PretrainCollator(object):
         text_examples = flat_list_of_lists([d["examples"] for d in batch])
         text_examples_WH1 = flat_list_of_lists([d["examples_WH1"] for d in batch])
         text_examples_WH2 = flat_list_of_lists([d["examples_WH2"] for d in batch])
-        #自己搞得，关于labels_Where和labels_When的
+        
         labels_When = torch.stack([d["labels_When"] for d in batch])  # (B, )
         labels_Where = torch.stack([d["labels_Where"] for d in batch])  # (B, )
 
@@ -358,7 +355,7 @@ class PretrainCollator(object):
         text_input_ids = batch_enc.input_ids  # (B, L)
         text_input_ids_no_mask = text_input_ids.clone()
 
-        # 根据上面的获得关于WH1的caption
+        
         batch_enc_WH1 = self.tokenizer.batch_encode_plus(
             [d["text_str_WH1"] for d in text_examples_WH1],
             max_length=self.max_length,
@@ -369,7 +366,7 @@ class PretrainCollator(object):
         text_input_ids_WH1 = batch_enc_WH1.input_ids  # (B, L)
         text_input_ids_no_mask_WH1 = text_input_ids_WH1.clone()
 
-        # 根据上面的获得关于WH2的caption
+        
         batch_enc_WH2 = self.tokenizer.batch_encode_plus(
             [d["text_str_WH2"] for d in text_examples_WH2],
             max_length=self.max_length,
@@ -394,46 +391,7 @@ class PretrainCollator(object):
 
         itm_labels = default_collate(
             [d["itm_label"] for d in text_examples])  # (B, )
-        
-        #这几句跟mpm有关erase_elems = [random_erase(e, patch_size=self.patch_size) for e in visual_inputs.clone()]
 
-        # if self.mpm:
-        #     crop_visual_inputs = v_collate([elems[0] for elems in erase_elems])
-        #     mpm_masks = v_collate([elems[1] for elems in erase_elems])
-        #     context_visual_inputs = v_collate([elems[2] for elems in erase_elems])
-
-        #     return dict(
-        #         crop_visual_inputs=crop_visual_inputs, # (B, #frm=1 or T, H, W, C)
-        #         context_visual_inputs=context_visual_inputs,
-        #         mpm_mask=mpm_masks,
-        #         text_input_ids=text_input_ids_no_mask,
-        #         mlm_text_input_ids=text_input_ids,
-        #         mlm_labels=mlm_labels,
-        #         text_input_mask=text_input_mask, # used to exclude [PAD] token
-        #         itm_labels=itm_labels,
-        #         n_examples_list=n_examples_list,  # used to create image feature copies.
-        #         type=batch[0]['type']
-        #     )
-        # else:
-        #     return dict(
-        #         visual_inputs_WH1=visual_inputs_WH1, # (B, #frm=1 or T, H, W, C)
-        #         visual_inputs_WH2=visual_inputs_WH2,
-        #         visual_inputs_When=visual_inputs_When,
-        #         visual_inputs_Where=visual_inputs_Where,
-        #         text_input_ids=text_input_ids_no_mask,
-        #         text_input_ids_WH1=text_input_ids_no_mask_WH1,
-        #         text_input_ids_WH2=text_input_ids_no_mask_WH2,
-        #         mlm_text_input_ids=text_input_ids,
-        #         mlm_labels=mlm_labels,
-        #         text_input_mask=text_input_mask, # used to exclude [PAD] token
-        #         text_input_mask_WH1=text_input_mask_WH1,
-        #         text_input_mask_WH2=text_input_mask_WH2,
-        #         itm_labels=itm_labels,
-        #         n_examples_list=n_examples_list,  # used to create image feature copies.
-        #         labels_When=labels_When,
-        #         labels_Where=labels_Where,
-        #         type=batch[0]['type']
-        #     )
         return dict(
             visual_inputs_WH1=visual_inputs_WH1,  # (B, #frm=1 or T, H, W, C)
             visual_inputs_WH2=visual_inputs_WH2,
