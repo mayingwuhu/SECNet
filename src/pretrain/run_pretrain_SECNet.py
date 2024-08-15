@@ -33,7 +33,7 @@ from transformers import BertConfig, BertTokenizerFast
 def mk_captions_pretrain_dataloader(dataset_name, anno_path, video_dir, txt_dir, cfg, tokenizer, 
                                     is_train=True, max_txt_len=80):
     # make a list(dict), where each dict {vis_id: int, txt: str}
-    #这个地方直接改成dataset_name=="VSET"
+
     if dataset_name == "VSET":
         datalist = json.load(open(anno_path))
         LOGGER.info('Found {} entries for VSET'.format(len(datalist)))
@@ -81,7 +81,7 @@ def setup_dataloaders(cfg, tokenizer):
     LOGGER.info("Init. train_loader and val_loader...")
 
     train_loaders = {}
-    #从cfg.train_datasets里加载参数，直接在cfg里修改文本保存地址ann和图片保存地址img
+
     for db in cfg.train_datasets:
         train_loaders[db.name] = mk_captions_pretrain_dataloader(
             dataset_name=db.name,
