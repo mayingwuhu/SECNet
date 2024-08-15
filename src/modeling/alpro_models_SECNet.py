@@ -63,8 +63,7 @@ class SECNet(nn.Module):
 
         self.bert_config = config
 
-        LOGGER.info(f'纯测试1')
-
+        
         visual_model_cls_WH1 = eval(WH1_enc_cfg['cls'])#video_enc_cfg['cls']：TimeSformer
         visual_model_cls_WH2 = eval(WH2_enc_cfg['cls'])
         visual_model_cls_Where = eval(Where_enc_cfg['cls'])
@@ -89,7 +88,7 @@ class SECNet(nn.Module):
 
         text_width = self.bert_config.hidden_size
 
-        #定义线性映射层
+
         self.vision_proj = nn.Linear(vision_width, embed_dim)
         self.text_proj = nn.Linear(text_width, embed_dim)
 
@@ -123,7 +122,7 @@ class SECNet_Pertrain(SECNet):
         self.text_encoder_wwcap = BertForMaskedLM.from_pretrained(
             './bert-base-uncased',
             config=self.bert_config)
-        self.visual_feat_fusion = nn.Linear(768*3, 256)#768是输出的vision_width，现在按三个视觉encoder算，做简单拼接cat
+        self.visual_feat_fusion = nn.Linear(768*3, 256)
         self.dropout_WH1 = nn.Dropout(p=0.5)
         self.dropout_WH2 = nn.Dropout(p=0.5)
         self.dropout_wwcap = nn.Dropout(p=0.5)
@@ -280,7 +279,7 @@ class SECNet_Pertrain(SECNet):
 
         text_embeds = text_output.last_hidden_state  # b, Lt, fsz=768
 
-        # 通过线性层和归一化操作计算特征向量
+
         text_feat = F.normalize(self.text_proj(text_embeds[:, 0, :]),
                                 dim=-1)  # self.text_proj = nn.Linear(text_width, embed_dim)
         text_feat = self.dropout_text(text_feat)
@@ -402,7 +401,7 @@ class Prompter(SECNetBaseModel):
             LOGGER.info("Keys in model but not in loaded:")
             LOGGER.info(f"In total {len(model_not_in_load)}, {sorted(model_not_in_load)}")
 
-        '''-----MY-----'''
+
         # FIXME a quick hack to avoid loading prompts
         temp_loaded_state_dict = dict()
         for k in loaded_state_dict:
@@ -724,8 +723,6 @@ class AlproForSequenceClassification(SECNetBaseModel):
 
 
 class AlproForVideoTextRetrieval(SECNetBaseModel):
-    """
-    """
     def __init__(self, config, video_enc_cfg, input_format='RGB'):
         super(AlproForVideoTextRetrieval, self).__init__(config, input_format=input_format, video_enc_cfg=video_enc_cfg)
 
@@ -746,7 +743,6 @@ class AlproForVideoTextRetrieval(SECNetBaseModel):
         visual_inputs = visual_inputs.transpose(1, 2)
         print("TEST1!!!")
 
-        #视频数据编码
         video_embeds = self.visual_encoder.forward_features(visual_inputs, return_all_tokens=True)
         # image_embeds = image_embeds.repeat(text_input_mask.shape[0], 1, 1)
         video_feat = F.normalize(self.vision_proj(video_embeds[:,0,:]),dim=-1)  
@@ -887,7 +883,7 @@ class AlproForVideoTextRetrieval(SECNetBaseModel):
         video_embeds = self.visual_encoder.forward_features(visual_inputs, return_all_tokens=True)#video embedding
         video_feat = F.normalize(self.vision_proj(video_embeds[:,0,:]),dim=-1)  #video feature
 
-        video_embeds = video_embeds.repeat(text_input_mask.shape[0], 1, 1)#重复64次  torch.Size([64, 197, 768])
+        video_embeds = video_embeds.repeat(text_input_mask.shape[0], 1, 1)# torch.Size([64, 197, 768])
         # image_feat = image_feat.repeat(text_input_mask.shape[0], 1)
 
         video_atts = torch.ones(video_embeds.size()[:-1],dtype=torch.long).to(device)
@@ -896,7 +892,7 @@ class AlproForVideoTextRetrieval(SECNetBaseModel):
                                              return_dict=True,
                                              mode='text'
                                             )
-        text_embeds = text_output.last_hidden_state#shape是(batch_size, sequence_length, hidden_size)，hidden_size=768,它是模型最后一层输出的隐藏状态
+        text_embeds = text_output.last_hidden_state
         text_feat = F.normalize(self.text_proj(text_embeds[:,0,:]),dim=-1)     #text feature
 
         vtc_sim_scores = video_feat @ text_feat.t() / self.temp #@矩阵乘法
