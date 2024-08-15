@@ -895,7 +895,7 @@ class AlproForVideoTextRetrieval(SECNetBaseModel):
         text_embeds = text_output.last_hidden_state
         text_feat = F.normalize(self.text_proj(text_embeds[:,0,:]),dim=-1)     #text feature
 
-        vtc_sim_scores = video_feat @ text_feat.t() / self.temp #@矩阵乘法
+        vtc_sim_scores = video_feat @ text_feat.t() / self.temp 
 
         attention_mask = torch.cat([text_input_mask, video_atts], dim=1)
         embedding_output = torch.cat([text_embeds, video_embeds], dim=1)
