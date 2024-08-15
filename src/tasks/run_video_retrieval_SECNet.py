@@ -14,7 +14,6 @@ import torch.nn.functional as F
 from apex import amp
 from easydict import EasyDict as edict
 
-sys.path.append("/home/mayu/pythonProject/ALPRO/ALPRO-main/src")
 from src.configs.config import shared_configs
 from src.datasets.data_utils import ImageNorm, mk_input_group
 from src.datasets.dataloader import InfiniteIterator, PrefetchLoader_my, PrefetchLoader
