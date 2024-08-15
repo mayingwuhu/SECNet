@@ -8,8 +8,6 @@ from torch.nn.functional import pad as img_tensor_pad
 from torch.nn.modules.utils import _quadruple
 from torchvision.transforms.functional import pad as img_pad
 from torchvision.transforms.functional import resize as img_resize
-
-sys.path.append("/home/mayu/pythonProject/ALPRO/ALPRO-main/src")
 from src.utils.basic_utils import flat_list_of_lists
 import numbers
 import numpy as np
@@ -524,22 +522,6 @@ def mk_input_group(key_grouped_examples, max_n_example_per_group=1, is_train=Tru
             [[sub_e[example_unique_key] for sub_e in e[1]] for e in input_groups])
         assert set(input_question_ids) == set(output_question_ids), "You are missing "
     return input_groups
-
-
-# def repeat_tensor_rows(raw_tensor, row_repeats):
-#     """ repeat raw_tensor[i] row_repeats[i] times.
-#     Args:
-#         raw_tensor: (B, *)
-#         row_repeats: list(int), len(row_repeats) == len(raw_tensor)
-#     """
-#     assert len(raw_tensor) == len(raw_tensor), "Has to be the same length"
-#     if sum(row_repeats) == len(row_repeats):
-#         return raw_tensor
-#     else:
-#         indices = torch.LongTensor(
-#             flat_list_of_lists([[i] * r for i, r in enumerate(row_repeats)])
-#         ).to(raw_tensor.device)
-#         return raw_tensor.index_select(0, indices)
 
 
 
