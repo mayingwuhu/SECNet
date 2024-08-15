@@ -1,16 +1,7 @@
-"""
-modified from UNITER codebase
-
-A meta data loader for sampling from different datasets / training tasks
-A prefetch loader to speedup data loading
-"""
 import random
 import sys
-
 import torch
 from torch.utils.data import DataLoader
-
-sys.path.append("/home/mayu/pythonProject/ALPRO/ALPRO-main/src")
 from src.utils.distributed import any_broadcast
 
 
@@ -39,7 +30,7 @@ class MetaLoader(object):
         self.step = 0
 
     def __iter__(self):
-        """ this iterator will run indefinitely """
+       
         task = self.sampling_pools[0]
         while True:
             if self.step % self.accum_steps == 0:
@@ -131,24 +122,10 @@ class PrefetchLoader(object):
         except StopIteration:
             self.batch = None
             return
-        # if record_stream() doesn't work, another option is to make sure
-        # device inputs are created on the main stream.
-        # self.next_input_gpu = torch.empty_like(self.next_input,
-        #                                        device='cuda')
-        # self.next_target_gpu = torch.empty_like(self.next_target,
-        #                                         device='cuda')
-        # Need to make sure the memory allocated for next_* is not still in use
-        # by the main stream at the time we start copying to next_*:
-        # self.stream.wait_stream(torch.cuda.current_stream())
+        
         with torch.cuda.stream(self.stream):
             self.batch = move_to_cuda(self.batch)
-            # more code for the alternative if record_stream() doesn't work:
-            # copy_ will record the use of the pinned source tensor in this
-            # side stream.
-            # self.next_input_gpu.copy_(self.next_input, non_blocking=True)
-            # self.next_target_gpu.copy_(self.next_target, non_blocking=True)
-            # self.next_input = self.next_input_gpu
-            # self.next_target = self.next_target_gpu
+           
 
     def next(self, it):
         torch.cuda.current_stream().wait_stream(self.stream)
@@ -164,7 +141,7 @@ class PrefetchLoader(object):
 
 
 class InfiniteIterator(object):
-    """iterate an iterable oobject infinitely"""
+   
     def __init__(self, iterable):
         self.iterable = iterable
         self.iterator = iter(iterable)
