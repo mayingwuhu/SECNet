@@ -2,7 +2,6 @@ import sys
 
 from torch.optim import Adam, Adamax
 
-sys.path.append("/home/mayu/pythonProject/ALPRO/ALPRO-main/src")
 from src.optimization.adamw import AdamW
 
 
