@@ -4,7 +4,6 @@ import sys
 
 from torch.utils.data.dataloader import default_collate
 
-sys.path.append("/home/mayu/pythonProject/ALPRO/ALPRO-main/src")
 from src.utils.basic_utils import flat_list_of_lists
 from src.utils.load_save import LOGGER
 from src.datasets.dataset_base import AlproBaseDataset
@@ -118,7 +117,7 @@ class VideoRetrievalCollator(object):
         text_input_ids = batch_enc.input_ids  # (B, L)
         text_input_mask = batch_enc.attention_mask  # (B, L)
 
-        #text_examples[0]:{'txt_str': '文字描述', 'id': 0}
+        
         if "itm_label" in text_examples[0]:
             itm_labels = default_collate(
                 [d["itm_label"] for d in text_examples])  # (B, )
@@ -184,22 +183,18 @@ class AlproVideoRetrievalEvalDataset(AlproBaseDataset):
         batch["examples"] = self.text_batch["examples"]
         batch["n_examples"] = self.text_batch["n_examples"]
         batch["ids"] = self.text_batch["ids"]
-        '''
-        假设index = 0
-        batch = {"vid_id":"video9770","examples":[],'n_examples'=1000,'ids'=[0,1,...,999]}
-        '''
+
         if self.ensemble_n_clips > 1:
             raise NotImplementedError('Do not support multiple clips for now.')
         else:
             # if self.is_train and self.random_sample_clips:
             vid_id = batch["vid_id"]
 
-            video_path = os.path.join(self.img_db_dir, vid_id + self.video_fmt) #定位视频路径
-            vid_frm_array = self._load_video_from_path_decord(video_path, height=self.max_img_size, width=self.max_img_size)#返回了视频抽样帧的数据，N*3*H*W
+            video_path = os.path.join(self.img_db_dir, vid_id + self.video_fmt) 
+            vid_frm_array = self._load_video_from_path_decord(video_path, height=self.max_img_size, width=self.max_img_size)
 
-        batch["vid"] = vid_frm_array#每一个batch中的vid由之前的video9770变成了这个视频中随即采样(N=8)的数据
-        '''分析OK'''
-        #batch = {"vid_id": 'video9770', "examples": [], 'n_examples' = 1000, 'ids' = [0, 1, ..., 999],'vid':[采样帧图像数据]}
+        batch["vid"] = vid_frm_array
+        
         return batch
 
     def _prepare_batches_by_video(self):
@@ -209,13 +204,13 @@ class AlproVideoRetrievalEvalDataset(AlproBaseDataset):
             text_list.append(dict(
                 text_str=d["txt"],
                 id=d["id"],
-            ))#记录每一个text和对应的id号，存为一个list,text_list = [{'txt_str':'文字描述','id':0},{'txt_str':'文字描述','id':1},...]
+            ))
         text_batch = dict(
             vid_id=None,
             examples=text_list,
             n_examples=len(text_list),
             ids=[d["id"] for d in text_list]
-        )#整个text的batch  text_batch={'vid_id':None,'examples'=[{'txt_str':'文字描述','id':0},{'txt_str':'文字描述','id':1},...],'n_examples'=1000,'ids'=[0,1,...,999]}
+        )
         # print("text_batch:",text_batch)
         # print("text_batch.keys",text_batch.keys())
         '''demo_test'''
@@ -231,5 +226,4 @@ class AlproVideoRetrievalEvalDataset(AlproBaseDataset):
             _batch["vid_id"] = d["vid_id"]
             batches.append(_batch)
         #batch=[{"vid_id":'video9770'},{"vid_id":'video9771'}...]
-        '''分析OK'''
         return batches, text_batch
