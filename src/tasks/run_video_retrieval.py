@@ -41,14 +41,6 @@ from transformers import BertConfig, BertTokenizerFast
 
 
 def mk_video_ret_datalist(raw_datalist, cfg):
-    """
-    Args:
-        raw_datalist: list(dict):raw_datalist中的一条数据{"caption": "a person is connecting something to system", "clip_name": "video9770", "retrieval_key": "ret0"}
-        目标格式：Each data point is {id: int, txt: str, vid_id: str}
-
-    Returns:
-
-    """
     LOGGER.info(f"Loaded data size {len(raw_datalist)}")
     if cfg.data_ratio != 1.0:
         random.shuffle(raw_datalist)
@@ -66,7 +58,6 @@ def mk_video_ret_datalist(raw_datalist, cfg):
         qid += 1
         datalist.append(d)
     LOGGER.info(f"datalist {len(datalist)}")
-    '''分析OK 输出形式[{'id': 0, 'txt': 'a person is connecting something to system', 'vid_id': 'video9770'}, {'id': 1, 'txt': 'a little girl does gymnastics', 'vid_id': 'video9771'}, {'id': 2, 'txt': 'a woman creating a fondant baby and flower', 'vid_id': 'video7020'}, {'id': 3, 'txt': 'a boy plays grand theft auto 5', 'vid_id': 'video9773'}]'''
     return datalist
 
 
@@ -132,15 +123,7 @@ def mk_video_ret_dataloader(anno_path, lmdb_dir, cfg, tokenizer, is_train=True):
 
 
 def mk_video_ret_eval_dataloader(anno_path, lmdb_dir, cfg, tokenizer):
-    """
-    anno_path:text.jsonl  eg:{"caption": "a person is connecting something to system", "clip_name": "video9770", "retrieval_key": "ret0"}
-    lmdb_dir:视频存储文件夹
-    tokenizer:下载的tokenizer所在文件夹
-    eval_retrieval: bool, will sample one video per batch paired with multiple text.
-    Returns:
-
-    """
-    raw_datalist = load_jsonl(anno_path)#读取jsonl文件，以一句一句的格式存储为列表
+    raw_datalist = load_jsonl(anno_path)
     datalist = mk_video_ret_datalist(raw_datalist, cfg)
     frm_sampling_strategy = cfg.frm_sampling_strategy#default:rand
     if frm_sampling_strategy == "rand":
@@ -163,11 +146,11 @@ def mk_video_ret_eval_dataloader(anno_path, lmdb_dir, cfg, tokenizer):
         video_fmt=video_fmt,
         img_db_type='rawvideo'
     )
-    #dataset[0] =  {"vid_id": 'video9770', "examples": [], 'n_examples' = 1000, 'ids' = [0, 1, ..., 999],'vid':[采样帧图像数据]}
+ 
 
     sampler = DistributedSampler(
         dataset, num_replicas=hvd.size(), rank=hvd.rank(),
-        shuffle=False)#分布式采样器，sampler提供数据集中元素的索引
+        shuffle=False)
     retrieval_collator = VideoRetrievalCollator(
         tokenizer=tokenizer, max_length=cfg.max_txt_len)
     dataloader = DataLoader(dataset,
@@ -177,7 +160,7 @@ def mk_video_ret_eval_dataloader(anno_path, lmdb_dir, cfg, tokenizer):
                             num_workers=cfg.n_workers,
                             pin_memory=cfg.pin_mem,
                             collate_fn=retrieval_collator.collate_batch)
-    #整合多个样本到一个batch时需要调用的函数，当 __getitem__ 返回的不是tensor而是字典之类时，需要进行 collate_fn的重载，同时可以进行数据的进一步处理以满足pytorch的输入要求
+
     img_norm = ImageNorm(mean=cfg.img_pixel_mean, std=cfg.img_pixel_std)
     dataloader = PrefetchLoader(dataloader, img_norm)
     return dataloader
@@ -221,7 +204,6 @@ def setup_model(cfg, device=None):
     video_enc_cfg['num_frm'] = cfg.num_frm
     video_enc_cfg['img_size'] = cfg.crop_img_size
 
-    '''问题定位'''
     model = AlproForVideoTextRetrieval(
         model_cfg, 
         input_format=cfg.img_input_format,
@@ -275,7 +257,7 @@ def validate(model, val_loader, eval_loader, cfg, train_global_step, eval_filepa
     debug_step = 10
     for val_step, batch in enumerate(val_loader):
         # forward pass
-        del batch["caption_ids"]#删除batch中的“caption_ids"
+        del batch["caption_ids"]
         outputs = forward_step(model, batch)
         targets = batch['labels']
 
@@ -654,7 +636,7 @@ def inference_retrieval(model, val_loader, eval_file_path, cfg):
 
     for batch in val_loader:
         # each batch contains 1 video and N (=1000) captions
-        n_mini_batches = math.ceil(len(batch["caption_ids"]) / eval_bsz)#math.ceil(x)获得大于等于x的最小整数 len(batch["caption_ids"]=1000  eval_bsz=64
+        n_mini_batches = math.ceil(len(batch["caption_ids"]) / eval_bsz)
         vid_id = batch["vid_id"]#'video9770'
         # print("========================",vid_id)
         for idx in range(n_mini_batches):
@@ -700,7 +682,7 @@ def inference_retrieval(model, val_loader, eval_file_path, cfg):
             sim_scores = torch.stack(sim_scores)
             
             # FIXME not sure why need to convert dtype explicitly
-            logits = logits.squeeze(0).float()#shape:[64,2] squeeze()去掉维度为1的
+            logits = logits.squeeze(0).float()
             # print("logits.shape:", logits.shape)
             # print("logits.shape[1]:", logits.shape[1])
             # print("logits.score:", logits)
@@ -723,7 +705,7 @@ def inference_retrieval(model, val_loader, eval_file_path, cfg):
                     txt_id=cap_id,
                     score=round(score, 4),
                     sim=round(sim, 4)
-                ))#round返回浮点数四舍五入的值
+                ))
 
         if hvd.rank() == 0:
             pbar.update(1)
@@ -775,31 +757,19 @@ def inference_retrieval(model, val_loader, eval_file_path, cfg):
 def start_inference(cfg):
     set_random_seed(cfg.seed)
 
-    '''
-    hvd多GPU分布式处理
-    hvd.local_rank()是当前节点上的GPU资源列表
-    hvd.rank()，是一个全局GPU资源列表
-    譬如有4台节点，每台节点上4块GPU，则num_workers的范围为0~15，local_rank为0~3
-    '''
     n_gpu = hvd.size()
     device = torch.device("cuda", hvd.local_rank())
     torch.cuda.set_device(hvd.local_rank())
     if hvd.rank() != 0:
         LOGGER.disabled = True
 
-    '''
-    os.path.splitext分开前缀与文件名，join(output/downstreams/msrvtt_ret/public,result_test,step_)
-    cfg.inference_txt_db:data/msrvtt_ret/txt/test.jsonl
-    os.path.basename(cfg.inference_txt_db):test.jsonl
-    os.path.splitext(os.path.basename(cfg.inference_txt_db)):[test,jsonl]
-    '''
+
     inference_res_dir = join(
         cfg.output_dir,
         f"results_{os.path.splitext(os.path.basename(cfg.inference_txt_db))[0]}/"
         f"step_{cfg.inference_model_step}_{cfg.inference_n_clips}_{cfg.score_agg_func}"
     )
 
-    '''hvd.rank() == 0 判断是否为master，理论上只有master负责模型存储与输出'''
     if hvd.rank() == 0:
         os.makedirs(inference_res_dir, exist_ok=True)
         save_json(cfg, join(inference_res_dir, "raw_args.json"),
@@ -836,11 +806,7 @@ def start_inference(cfg):
     # prepare data
     tokenizer = BertTokenizerFast.from_pretrained(cfg.tokenizer_dir)#config_release/msrvtt_ret.json:"tokenizer_dir": "ext/bert-base-uncased/"
     cfg.data_ratio = 1.
-    '''
-    val_loader 的制作路径
-    anno_path:data/msrvtt_qa/txt/test.jsonl
-    lmdb_dir:data/msrvtt_qa/videos
-    '''
+
     val_loader = mk_video_ret_eval_dataloader(
         anno_path=cfg.inference_txt_db,
         lmdb_dir=cfg.inference_img_db,
