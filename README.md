@@ -7,7 +7,7 @@
 ### Dependencies
 This code is designed to run on Ubuntu. You will need to prepare the following:
 
-1. Visit [Link](#) (content is hosted on Google; Due to anonymous submission, link will be available soon) to download `ALPRO_model.pt`, `SECNet_model.pt`, `bert-base-uncased.zip`, `vit_base_patch16_224.zip`, and `ext.zip` to the root directory. Unzip the corresponding files. 
+1. Visit [Link](#) (Due to anonymous submission, link will be available soon) to download `ALPRO_model.pt`, `SECNet_model.pt`, `bert-base-uncased.zip`, `vit_base_patch16_224.zip`, and `ext.zip` to the root directory. Unzip the corresponding files. 
 2. Download `videos.pt` and place it in the `data/msrvtt_ret/` . 
 
 The final directory structure should look like this:
