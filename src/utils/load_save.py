@@ -10,7 +10,6 @@ import torch
 from apex import amp
 from easydict import EasyDict as edict
 
-sys.path.append("/home/mayu/pythonProject/ALPRO/ALPRO-main/src")
 from src.utils.basic_utils import save_json, make_zipfile
 from src.utils.logger import LOGGER
 
@@ -63,7 +62,7 @@ class ModelSaver(object):
                         {k: v.cpu() if isinstance(v, torch.Tensor) else v
                          for k, v in optimizer.state_dict().items()}
                     dump = {'step': step, 'optimizer': optimizer_state_dict}
-                    torch.save(
+                    torch.save(  
                         dump,
                         f'{self.output_dir}/{prefix}_step_{step}_train_state.pt')
                 break
@@ -85,7 +84,7 @@ def load_state_dict_with_pos_embed_resizing(model, loaded_state_dict_or_path,
     remove_text_encoder_prefix: set to True, when finetune downstream models from pre-trained checkpoints.
     """
 
-    content = torch.load("/home/mayu/pythonProject/ALPRO-main/output/downstreams/msrvtt_qa/public/ckpt/model_step_best.pt")
+    content = torch.load("/output/downstreams/msrvtt_qa/public/ckpt/model_step_best.pt")  
 
     if isinstance(loaded_state_dict_or_path, str):
         loaded_state_dict = torch.load(
